@@ -1,0 +1,116 @@
+template:
+  name: s3-policy-blocking
+  identifier: s3policyblocking
+  versionLabel: v1
+  type: Step
+  projectIdentifier: default_project
+  orgIdentifier: default
+  tags: {}
+  description: Blocking governance checks for S3 bucket provisioning
+  spec:
+    type: Run
+    spec:
+      shell: Bash
+      command: |-
+
+        echo "============================================" 
+
+        echo "POLICY CHECK - BLOCKING MODE v1" 
+
+        echo "============================================" 
+
+
+
+        BUCKET_NAME="<+pipeline.variables.bucket_name>" 
+
+        VISIBILITY="<+pipeline.variables.bucket_visibility>" 
+
+        VIOLATIONS=0 
+
+
+
+        # Rule 1: Bucket name must be lowercase 
+
+        LOWER=$(echo "$BUCKET_NAME" | tr '[:upper:]' '[:lower:]') 
+
+        if [ "$BUCKET_NAME" != "$LOWER" ]; then 
+
+          echo "BLOCKED: Bucket name '$BUCKET_NAME' must be all lowercase" 
+
+          VIOLATIONS=$((VIOLATIONS + 1)) 
+
+        fi 
+
+
+
+        # Rule 2: Bucket name minimum 5 characters 
+
+        NAME_LENGTH=${#BUCKET_NAME} 
+
+        if [ "$NAME_LENGTH" -lt 5 ]; then 
+
+          echo "BLOCKED: Bucket name too short (min 5 chars, got $NAME_LENGTH)" 
+
+          VIOLATIONS=$((VIOLATIONS + 1)) 
+
+        fi 
+
+
+
+        # Rule 3: No underscores or spaces 
+
+        if echo "$BUCKET_NAME" | grep -qE '[_ ]'; then 
+
+          echo "BLOCKED: Bucket name contains underscores or spaces - use hyphens instead" 
+
+          VIOLATIONS=$((VIOLATIONS + 1)) 
+
+        fi 
+
+
+
+        # Rule 4: Must have environment prefix 
+
+        if ! echo "$BUCKET_NAME" | grep -qE '^(dev|staging|prod|test)'; then 
+
+          echo "BLOCKED: Bucket name missing environment prefix (dev/staging/prod/test)" 
+
+          VIOLATIONS=$((VIOLATIONS + 1)) 
+
+        fi 
+
+
+
+        # Rule 5: Visibility must be private 
+
+        if [ "$VISIBILITY" = "public" ]; then 
+
+          echo "BLOCKED: Bucket visibility cannot be PUBLIC - private is required" 
+
+          VIOLATIONS=$((VIOLATIONS + 1)) 
+
+        fi 
+
+
+
+        echo "--------------------------------------------" 
+
+        if [ "$VIOLATIONS" -eq 0 ]; then 
+
+          echo "All policy checks passed! Proceeding..." 
+
+          echo "============================================" 
+
+          exit 0 
+
+        else 
+
+          echo "POLICY VIOLATION: $VIOLATIONS rule(s) failed" 
+
+          echo "Pipeline BLOCKED. Fix the above issues and re-run." 
+
+          echo "============================================" 
+
+          exit 1 
+
+        fi 
