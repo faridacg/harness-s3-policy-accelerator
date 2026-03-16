@@ -1,0 +1,111 @@
+name: Create S3 Bucket 
+
+  
+
+on: 
+
+  workflow_dispatch: 
+
+    inputs: 
+
+      bucket_name: 
+
+        description: S3 bucket name (must be globally unique) 
+
+        required: true 
+
+      aws_region: 
+
+        description: AWS region 
+
+        required: true 
+
+        default: us-east-1 
+
+      bucket_visibility: 
+
+        description: private or public 
+
+        required: true 
+
+        default: private 
+
+  
+
+jobs: 
+
+  create-s3-bucket: 
+
+    runs-on: ubuntu-latest 
+
+    steps: 
+
+      - name: Configure AWS Credentials 
+
+        uses: aws-actions/configure-aws-credentials@v4 
+
+        with: 
+
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} 
+
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} 
+
+          aws-region: ${{ github.event.inputs.aws_region }} 
+
+  
+
+      - name: Verify AWS Identity 
+
+        run: aws sts get-caller-identity 
+
+  
+
+      - name: Create S3 Bucket 
+
+        run: | 
+
+          if [ "${{ github.event.inputs.aws_region }}" = "us-east-1" ]; then 
+
+            aws s3api create-bucket \ 
+
+              --bucket ${{ github.event.inputs.bucket_name }} \ 
+
+              --region us-east-1 
+
+          else 
+
+            aws s3api create-bucket \ 
+
+              --bucket ${{ github.event.inputs.bucket_name }} \ 
+
+              --region ${{ github.event.inputs.aws_region }} \ 
+
+              --create-bucket-configuration LocationConstraint=${{ github.event.inputs.aws_region }} 
+
+          fi 
+
+  
+
+      - name: Apply Private Access Block 
+
+        if: ${{ github.event.inputs.bucket_visibility == 'private' }} 
+
+        run: | 
+
+          aws s3api put-public-access-block \ 
+
+            --bucket ${{ github.event.inputs.bucket_name }} \ 
+
+            --public-access-block-configuration \ 
+
+            "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" 
+
+          echo "Private access block applied." 
+
+  
+
+      - name: Done 
+
+        run: echo "Bucket ${{ github.event.inputs.bucket_name }} created successfully in ${{ github.event.inputs.aws_region }}!" 
+
+ 
